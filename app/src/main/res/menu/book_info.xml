@@ -26,6 +26,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_manage_tags"
+        android:title="@string/manage_tags"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_refresh"
         android:title="@string/refresh"
         app:showAsAction="never" />

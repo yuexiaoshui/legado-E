@@ -50,6 +50,9 @@ import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.http.newCallStrResponse
+import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.http.postJson
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
@@ -89,6 +92,7 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ConvertUtils
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.GSON
+import io.legado.app.utils.runOnUI
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
@@ -296,6 +300,8 @@ class BookInfoActivity :
                     }
                 }
             }
+
+            R.id.menu_manage_tags -> manageServerTags()
 
             R.id.menu_edit -> {
                 viewModel.getBook()?.let {
@@ -1173,6 +1179,81 @@ class BookInfoActivity :
     private fun destroyWeb() {
         pooledWebView?.let { WebViewPool.release(it) }
         pooledWebView = null
+    }
+
+
+    // ── 服务器标签 ──
+
+    /** 从 tocUrl 里解析出自建书源的 服务器地址 / 书籍 id / token。 */
+    private fun serverInfoOf(book: Book): Triple<String, String, String>? {
+        val base = Regex("^(https?://[^/?#]+)").find(book.tocUrl)?.groupValues?.get(1)
+            ?: viewModel.bookSource?.bookSourceUrl?.let {
+                Regex("^(https?://[^/?#]+)").find(it)?.groupValues?.get(1)
+            }
+        val id = Regex("[?&]id=(\\d+)").find(book.tocUrl)?.groupValues?.get(1)
+        val token = Regex("[?&]token=([^&]+)").find(book.tocUrl)?.groupValues?.get(1) ?: ""
+        if (base.isNullOrEmpty() || id.isNullOrEmpty()) return null
+        return Triple(base, id, token)
+    }
+
+    private fun manageServerTags() {
+        val book = viewModel.getBook() ?: return
+        val info = serverInfoOf(book)
+        if (info == null) {
+            toastOnUi("这本书不是自建书源的书，无法管理标签")
+            return
+        }
+        val (base, id, token) = info
+        lifecycleScope.launch(IO) {
+            try {
+                val url = buildString {
+                    append(base).append("/api/legado/book-tags?id=").append(id)
+                    if (token.isNotEmpty()) append("&token=").append(token)
+                }
+                val body = okHttpClient.newCallStrResponse { url(url) }.body ?: ""
+                val obj = GSON.fromJson(body, com.google.gson.JsonObject::class.java)
+                val tags = obj?.getAsJsonArray("tags")
+                    ?.joinToString(",") { it.asJsonObject.get("name").asString } ?: ""
+                runOnUI { showTagsDialog(base, id, token, tags) }
+            } catch (e: Exception) {
+                toastOnUi("获取标签失败: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    private fun showTagsDialog(base: String, id: String, token: String, tags: String) {
+        val dialogBinding = io.legado.app.databinding.DialogEditTextBinding.inflate(layoutInflater)
+        dialogBinding.editView.setText(tags)
+        dialogBinding.editView.hint = getString(R.string.tags_hint)
+        alert(titleResource = R.string.manage_tags) {
+            setMessage("标签会显示在书籍简介第一行，多个用逗号分隔")
+            customView { dialogBinding.root }
+            okButton {
+                val newTags = dialogBinding.editView.text?.toString() ?: ""
+                saveServerTags(base, id, token, newTags)
+            }
+            noButton()
+        }
+    }
+
+    private fun saveServerTags(base: String, id: String, token: String, tags: String) {
+        lifecycleScope.launch(IO) {
+            try {
+                val url = buildString {
+                    append(base).append("/api/legado/book-tags?id=").append(id)
+                    append("&tags=").append(java.net.URLEncoder.encode(tags, "UTF-8"))
+                    if (token.isNotEmpty()) append("&token=").append(token)
+                }
+                okHttpClient.newCallStrResponse {
+                    url(url)
+                    postJson("{}")
+                }
+                toastOnUi("标签已保存")
+                runOnUI { refreshBook() }
+            } catch (e: Exception) {
+                toastOnUi("保存失败: ${e.localizedMessage}")
+            }
+        }
     }
 
 }

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.toc.rule
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -15,7 +16,11 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.databinding.ActivityTxtTocRuleBinding
 import io.legado.app.databinding.DialogEditTextBinding
+import io.legado.app.databinding.DialogServerSyncBinding
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.http.newCallStrResponse
+import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.http.postJson
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.association.ImportTxtTocRuleDialog
@@ -33,6 +38,7 @@ import io.legado.app.utils.launch
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -273,6 +279,8 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
                 *adapter.selection.toTypedArray()
             )
 
+            R.id.menu_upload_server -> uploadSelectionToServer()
+
             R.id.menu_export_selection -> exportResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
@@ -283,6 +291,71 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
             }
         }
         return true
+    }
+
+
+    /** 把选中的目录规则上传到自建书籍服务器（服务端 /api/legado/toc-rules-upload）。 */
+    private fun uploadSelectionToServer() {
+        val selection = adapter.selection.toList()
+        if (selection.isEmpty()) {
+            toastOnUi("请先勾选要上传的规则")
+            return
+        }
+        val prefs = getSharedPreferences("server_sync", Context.MODE_PRIVATE)
+        val dialogBinding = DialogServerSyncBinding.inflate(layoutInflater)
+        dialogBinding.editBase.setText(prefs.getString("base", "http://legado.yuezy.top"))
+        dialogBinding.editToken.setText(prefs.getString("token", ""))
+        alert(titleResource = R.string.upload_to_server) {
+            setMessage("已选 ${selection.size} 条规则")
+            customView { dialogBinding.root }
+            okButton {
+                val base = dialogBinding.editBase.text?.toString()?.trim()?.trimEnd('/')
+                    ?.trimEnd('?') ?: ""
+                val token = dialogBinding.editToken.text?.toString()?.trim() ?: ""
+                if (base.isEmpty()) {
+                    toastOnUi("请填写服务器地址")
+                    return@okButton
+                }
+                prefs.edit().putString("base", base).putString("token", token).apply()
+                doUploadRules(base, token, selection)
+            }
+            noButton()
+        }
+    }
+
+    private fun doUploadRules(base: String, token: String, rules: List<TxtTocRule>) {
+        lifecycleScope.launch(IO) {
+            try {
+                val payload = mapOf(
+                    "rules" to rules.map {
+                        mapOf(
+                            "name" to it.name,
+                            "rule" to it.rule,
+                            "example" to (it.example ?: ""),
+                            "serialNumber" to it.serialNumber,
+                            "enable" to it.enable
+                        )
+                    }
+                )
+                val url = buildString {
+                    append(base).append("/api/legado/toc-rules-upload")
+                    if (token.isNotEmpty()) {
+                        append("?token=").append(java.net.URLEncoder.encode(token, "UTF-8"))
+                    }
+                }
+                val body = okHttpClient.newCallStrResponse {
+                    url(url)
+                    postJson(GSON.toJson(payload))
+                }.body ?: throw IllegalStateException("服务器无响应")
+                val obj = GSON.fromJson(body, com.google.gson.JsonObject::class.java)
+                val added = obj?.get("added")?.asInt ?: 0
+                val updated = obj?.get("updated")?.asInt ?: 0
+                val skipped = obj?.get("skipped")?.asInt ?: 0
+                toastOnUi("上传完成：新增 $added，更新 $updated，跳过 $skipped")
+            } catch (e: Exception) {
+                toastOnUi("上传失败: ${e.localizedMessage}")
+            }
+        }
     }
 
 }

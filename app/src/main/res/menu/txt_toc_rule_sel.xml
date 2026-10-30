@@ -17,4 +17,9 @@
         android:title="@string/export_selection"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_upload_server"
+        android:title="@string/upload_to_server"
+        app:showAsAction="never" />
+
 </menu>
