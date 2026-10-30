@@ -32,6 +32,11 @@
         android:visible="true">
 
         <item
+            android:id="@+id/menu_toc_rule_server"
+            android:title="@string/toc_rule_server"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_reverse_toc"
             android:title="@string/reverse_toc"
             app:showAsAction="never" />

@@ -113,7 +113,8 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     private fun selectLastTab() {
         tabLayout.post {
             tabLayout.removeOnTabSelectedListener(this)
-            tabLayout.getTabAt(AppConfig.saveTabPosition)?.select()
+            // 固定进入第一个分组（全部）；最近阅读由用户自行切换
+            tabLayout.getTabAt(0)?.select()
             tabLayout.addOnTabSelectedListener(this)
         }
     }

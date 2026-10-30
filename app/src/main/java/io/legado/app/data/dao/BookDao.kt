@@ -11,6 +11,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.help.book.RecentGroup
 import io.legado.app.help.book.isNotShelf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -28,7 +29,11 @@ interface BookDao {
             BookGroup.IdLocalNone -> flowLocalNoGroup()
             BookGroup.IdVideo -> flowVideo()
             BookGroup.IdError -> flowUpdateError()
-            else -> flowByUserGroup(groupId)
+            else -> if (RecentGroup.isRecentGroup(groupId)) {
+                flowRecentOnly(groupId)
+            } else {
+                flowByUserGroup(groupId)
+            }
         }.map { list ->
             list.filterNot { it.isNotShelf }
         }
@@ -44,8 +49,31 @@ interface BookDao {
     )
     fun flowRoot(): Flow<List<Book>>
 
-    @Query("SELECT * FROM books order by durChapterTime desc")
+    /**
+     * 「全部」：排除仅属于「最近阅读」的书（未整理的书）。
+     * 若书同时属于「最近阅读」和某个自定义分组，说明已被整理，应在「全部」展示。
+     */
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE (`group` & (SELECT IFNULL(SUM(groupId),0) FROM book_groups
+                          WHERE groupName = '最近阅读')) = 0
+           OR (`group` & ((SELECT IFNULL(SUM(groupId),0) FROM book_groups WHERE groupId > 0)
+               - (SELECT IFNULL(SUM(groupId),0) FROM book_groups WHERE groupName = '最近阅读'))) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
     fun flowAll(): Flow<List<Book>>
+
+    /** 「最近阅读」分组：只显示仅属于该分组的书（未整理的书） */
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE (`group` & :group) > 0
+        AND (`group` & ((SELECT IFNULL(SUM(groupId),0) FROM book_groups WHERE groupId > 0) - :group)) = 0
+        """
+    )
+    fun flowRecentOnly(group: Long): Flow<List<Book>>
 
     @Query("SELECT * FROM books WHERE type & ${BookType.audio} > 0")
     fun flowAudio(): Flow<List<Book>>

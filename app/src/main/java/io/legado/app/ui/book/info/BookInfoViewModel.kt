@@ -21,6 +21,7 @@ import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.RecentGroup
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isLocal
@@ -428,6 +429,33 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
                 AudioPlay.book = book
             }
+        }.onSuccess {
+            success?.invoke()
+        }
+    }
+
+    /** 书源阅读（未收藏）的书自动进入「最近阅读」分组；已在自定义分组的书不重复归入 */
+    fun readFromRecentGroup(book: Book, success: (() -> Unit)? = null) {
+        execute {
+            val recentId = RecentGroup.ensure()
+            // 已属于某个自定义分组的书视为已整理，不再加入最近阅读（也不清空其原有分组）
+            if ((book.group and appDb.bookGroupDao.idsSum) == 0L) {
+                book.group = book.group or recentId
+            }
+            book.removeType(BookType.notShelf)
+            if (book.order == 0) {
+                book.order = appDb.bookDao.minOrder - 1
+            }
+            appDb.bookDao.getBook(book.name, book.author)?.let {
+                book.durChapterIndex = it.durChapterIndex
+                book.durChapterPos = it.durChapterPos
+                book.durChapterTitle = it.durChapterTitle
+            }
+            book.save()
+            if (ReadBook.book?.isSameNameAuthor(book) == true) {
+                ReadBook.book = book
+            }
+            inBookshelf = true
         }.onSuccess {
             success?.invoke()
         }

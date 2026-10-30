@@ -355,6 +355,7 @@
     <string name="pt_show_all_find">显示所有发现</string>
     <string name="ps_show_all_find">关闭则只显示勾选源的发现</string>
     <string name="update_toc">更新目录</string>
+    <string name="toc_rule_server">切换分章规则（服务器）</string>
     <string name="txt_toc_rule">TXT 目录规则</string>
     <string name="select_section_export">选择待导出章节</string>
     <string name="set_charset">设置编码</string>
@@ -837,6 +838,8 @@
     <string name="pre_download">预下载</string>
     <string name="pre_download_m">预下载%s页</string>
     <string name="pre_download_s">预先下载 %s 章正文</string>
+    <string name="recent_keep_count_title">最近阅读保留数量</string>
+    <string name="recent_keep_count_summary">书源阅读的书自动进入最近阅读分组，保留最近 %s 本</string>
     <string name="is_enabled">是否启用</string>
     <string name="background_image">背景图片</string>
     <string name="background_image_blurring">背景图片虚化</string>

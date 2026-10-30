@@ -131,6 +131,12 @@
             android:summary="@string/pre_download_s"
             android:title="@string/pre_download" />
 
+        <io.legado.app.lib.prefs.Preference
+            android:key="recentKeepCount"
+            android:summary="@string/recent_keep_count_summary"
+            android:title="@string/recent_keep_count_title"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="replaceEnableDefault"

@@ -537,6 +537,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.preDownloadNum, value)
         }
 
+    var recentKeepCount: Int
+        get() = appCtx.getPrefInt(PreferKey.recentKeepCount, 1000)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.recentKeepCount, value)
+        }
+
     val syncBookProgress get() = appCtx.getPrefBoolean(PreferKey.syncBookProgress, true)
 
     val syncBookProgressPlus get() = appCtx.getPrefBoolean(PreferKey.syncBookProgressPlus, false)

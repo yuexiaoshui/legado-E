@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentPagerAdapter
@@ -27,8 +28,10 @@ import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.gone
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
+import com.google.gson.JsonObject
 
 /**
  * 目录
@@ -130,6 +133,19 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                 TxtTocRuleDialog(viewModel.bookData.value?.tocUrl)
             )
 
+            R.id.menu_toc_rule_server -> {
+                viewModel.bookData.value?.let { book ->
+                    toastOnUi("正在获取规则列表…")
+                    viewModel.loadServerTocRules(book) { result ->
+                        result.onSuccess { obj ->
+                            showServerTocRuleDialog(book, obj)
+                        }.onFailure {
+                            toastOnUi("获取规则失败: ${it.localizedMessage}")
+                        }
+                    }
+                }
+            }
+
             R.id.menu_split_long_chapter -> {
                 viewModel.bookData.value?.let { book ->
                     item.isChecked = !item.isChecked
@@ -177,8 +193,47 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
         }
     }
 
-    private fun upBookAndToc(book: Book) {
-        waitDialog.show()
+    /** 服务器分章规则选择对话框（配合自建书源 API）。 */
+    private fun showServerTocRuleDialog(book: Book, obj: JsonObject) {
+        val current = obj.get("current")?.asString ?: ""
+        val names = mutableListOf("自动（选优算法）")
+        obj.getAsJsonArray("rules")?.forEach { el ->
+            val o = el.asJsonObject
+            names.add("${o.get("name").asString}（${o.get("count").asInt} 章）")
+        }
+        val checked = if (current.isEmpty()) 0 else names.indexOfFirst {
+            it.startsWith(current)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("切换分章规则")
+            .setSingleChoiceItems(names.toTypedArray(), checked) { dialog, which ->
+                dialog.dismiss()
+                val rule = if (which == 0) "__auto__"
+                else names[which].substringBefore("（")
+                val wait = WaitDialog(this)
+                wait.setText("正在按新规则刷新目录…")
+                wait.show()
+                viewModel.switchServerTocRule(book, rule) { err ->
+                    wait.dismiss()
+                    if (err != null) {
+                        toastOnUi("切换失败: ${err.localizedMessage}")
+                    } else {
+                        toastOnUi(if (which == 0) "已恢复自动选优" else "已切换规则: $rule")
+                        viewModel.chapterListCallBack?.upChapterList(
+                            searchView?.query?.toString()
+                        )
+                        setResult(RESULT_OK, Intent().apply {
+                            putExtra("index", ReadBook.durChapterIndex)
+                            putExtra("chapterPos", 0)
+                        })
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun upBookAndToc(book: Book) {        waitDialog.show()
         viewModel.upBookTocRule(book) {
             waitDialog.dismiss()
             if (ReadBook.book == book) {

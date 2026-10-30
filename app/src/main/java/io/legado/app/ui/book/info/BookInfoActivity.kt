@@ -1067,8 +1067,7 @@ class BookInfoActivity :
 
     private fun readBook(book: Book) {
         if (!viewModel.inBookshelf) {
-            book.addType(BookType.notShelf)
-            viewModel.saveBook(book) {
+            viewModel.readFromRecentGroup(book) {
                 viewModel.saveChapterList {
                     startReadActivity(book)
                 }

@@ -38,6 +38,7 @@ import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.RecentGroup
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig.applyDayNight
@@ -105,6 +106,9 @@ class App : Application() {
             }
             RuleBigDataHelp.clearInvalid()
             BookHelp.clearInvalidCache()
+            //最近阅读分组与清理
+            RecentGroup.ensure()
+            RecentGroup.cleanup()
             Backup.clearCache()
             ReadBookConfig.clearBgAndCache()
 //            ThemeConfig.clearBg() //每次手动切换主题时清理多余图片

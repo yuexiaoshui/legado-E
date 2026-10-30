@@ -357,6 +357,7 @@
     <string name="pt_show_all_find">Display all Discovery</string>
     <string name="ps_show_all_find">Display the selected origin\'s Discovery if closed</string>
     <string name="update_toc">Update chapters</string>
+    <string name="toc_rule_server">Switch chapter rules (server)</string>
     <string name="txt_toc_rule">Txt Catalog Rule</string>
     <string name="select_section_export">Choose some chapters to be exported</string>
     <string name="set_charset">Text encoding</string>
@@ -839,6 +840,8 @@
     <string name="pre_download">Download in advance</string>
     <string name="pre_download_m">Pre-download %s pages</string>
     <string name="pre_download_s">Download %s chapters in advance</string>
+    <string name="recent_keep_count_title">Recent reading keep count</string>
+    <string name="recent_keep_count_summary">Books read from sources go into the "Recent reading" group; keep %s most recent books</string>
     <string name="is_enabled">Is enabled</string>
     <string name="background_image">Background image</string>
     <string name="background_image_blurring">Background image blurring</string>

@@ -68,6 +68,7 @@ class OtherConfigFragment : PreferenceFragment(),
         addPreferencesFromResource(R.xml.pref_config_other)
         upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
+        upPreferenceSummary(PreferKey.recentKeepCount, AppConfig.recentKeepCount.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())
         upPreferenceSummary(PreferKey.webPort, AppConfig.webPort.toString())
         AppConfig.defaultBookTreeUri?.let {
@@ -111,6 +112,15 @@ class OtherConfigFragment : PreferenceFragment(),
                 .setValue(AppConfig.preDownloadNum)
                 .show {
                     AppConfig.preDownloadNum = it
+                }
+
+            PreferKey.recentKeepCount -> NumberPickerDialog(requireContext())
+                .setTitle(getString(R.string.recent_keep_count_title))
+                .setMaxValue(10000)
+                .setMinValue(10)
+                .setValue(AppConfig.recentKeepCount)
+                .show {
+                    AppConfig.recentKeepCount = it
                 }
 
             PreferKey.threadCount -> NumberPickerDialog(requireContext())
@@ -176,6 +186,10 @@ class OtherConfigFragment : PreferenceFragment(),
         when (key) {
             PreferKey.preDownloadNum -> {
                 upPreferenceSummary(key, AppConfig.preDownloadNum.toString())
+            }
+
+            PreferKey.recentKeepCount -> {
+                upPreferenceSummary(key, AppConfig.recentKeepCount.toString())
             }
 
             PreferKey.threadCount -> {
@@ -245,6 +259,9 @@ class OtherConfigFragment : PreferenceFragment(),
         when (preferenceKey) {
             PreferKey.preDownloadNum -> preference.summary =
                 getString(R.string.pre_download_s, value)
+
+            PreferKey.recentKeepCount -> preference.summary =
+                getString(R.string.recent_keep_count_summary, value)
 
             PreferKey.threadCount -> preference.summary = getString(R.string.threads_num, value)
             PreferKey.webPort -> preference.summary = getString(R.string.web_port_summary, value)
