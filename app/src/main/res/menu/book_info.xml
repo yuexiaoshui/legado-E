@@ -31,6 +31,16 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_sync_server"
+        android:title="@string/sync_to_server"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_abandon_server"
+        android:title="@string/abandon_book_server"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_refresh"
         android:title="@string/refresh"
         app:showAsAction="never" />

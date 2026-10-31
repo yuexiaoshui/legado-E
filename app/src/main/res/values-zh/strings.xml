@@ -1244,4 +1244,6 @@
     <string name="server_token">访问令牌（可留空）</string>
     <string name="manage_tags">管理标签</string>
     <string name="tags_hint">多个标签用逗号分隔</string>
+    <string name="sync_to_server">同步书名·作者到服务器</string>
+    <string name="abandon_book_server">废弃书籍（服务器）</string>
 </resources>

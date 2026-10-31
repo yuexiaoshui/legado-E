@@ -1351,4 +1351,6 @@
     <string name="server_token">Access token (optional)</string>
     <string name="manage_tags">Manage tags</string>
     <string name="tags_hint">Separate tags with commas</string>
+    <string name="sync_to_server">Sync title &amp; author to server</string>
+    <string name="abandon_book_server">Abandon book (server)</string>
 </resources>

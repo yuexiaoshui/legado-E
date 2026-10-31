@@ -176,6 +176,8 @@ class BookInfoActivity :
     ) {
         if (it.resultCode == RESULT_OK) {
             viewModel.upEditBook()
+            // 原生编辑刚保存，稍等一拍再读库，把新书名/作者同步到自建服务器
+            syncServerInfoSilently()
         }
     }
     private val editSourceResult = registerForActivityResult(
@@ -302,6 +304,10 @@ class BookInfoActivity :
             }
 
             R.id.menu_manage_tags -> manageServerTags()
+
+            R.id.menu_sync_server -> pushBookInfoToServer()
+
+            R.id.menu_abandon_server -> abandonBookOnServer()
 
             R.id.menu_edit -> {
                 viewModel.getBook()?.let {
@@ -1253,6 +1259,93 @@ class BookInfoActivity :
             } catch (e: Exception) {
                 toastOnUi("保存失败: ${e.localizedMessage}")
             }
+        }
+    }
+
+
+    // ── 服务器同步：书名 / 作者 / 废弃 ──
+
+    /** 原生「编辑书籍」保存后自动同步到服务器（延迟读数，避免与 ViewModel 写库抢跑）。 */
+    private fun syncServerInfoSilently() {
+        val book = viewModel.getBook() ?: return
+        val info = serverInfoOf(book) ?: return
+        lifecycleScope.launch(IO) {
+            kotlinx.coroutines.delay(600)
+            val fresh = appDb.bookDao.getBook(book.bookUrl) ?: book
+            val (base, id, token) = info
+            try {
+                postServerBookInfo(base, id, token, fresh.name, fresh.author)
+            } catch (e: Exception) {
+                // 静默失败，不打扰阅读
+            }
+        }
+    }
+
+    private suspend fun postServerBookInfo(base: String, id: String, token: String,
+                                           title: String, author: String) {
+        val url = buildString {
+            append(base).append("/api/legado/book-update?id=").append(id)
+            append("&book_title=").append(java.net.URLEncoder.encode(title, "UTF-8"))
+            append("&author=").append(java.net.URLEncoder.encode(author, "UTF-8"))
+            if (token.isNotEmpty()) append("&token=").append(token)
+        }
+        okHttpClient.newCallStrResponse {
+            url(url)
+            postJson("{}")
+        }
+    }
+
+    /** 手动把当前书名·作者推到服务器（原生编辑没触发同步时兜底）。 */
+    private fun pushBookInfoToServer() {
+        val book = viewModel.getBook() ?: return
+        val info = serverInfoOf(book)
+        if (info == null) {
+            toastOnUi("这本书不是自建书源的书，无法同步")
+            return
+        }
+        val (base, id, token) = info
+        lifecycleScope.launch(IO) {
+            try {
+                postServerBookInfo(base, id, token, book.name, book.author)
+                runOnUI { toastOnUi("已同步：${book.name}") }
+            } catch (e: Exception) {
+                runOnUI { toastOnUi("同步失败: ${e.localizedMessage}") }
+            }
+        }
+    }
+
+    /** 废弃书籍：服务器标记 abandoned，并删除本地这本书（章节缓存一起清掉）。 */
+    private fun abandonBookOnServer() {
+        val book = viewModel.getBook() ?: return
+        val info = serverInfoOf(book)
+        if (info == null) {
+            toastOnUi("这本书不是自建书源的书，无法废弃")
+            return
+        }
+        val (base, id, token) = info
+        alert(titleResource = R.string.abandon_book_server) {
+            setMessage("《${book.name}》\n\n服务器会标记为已废弃，不再参与重试与发现页；本地这本书也会从书架删除。")
+            okButton {
+                lifecycleScope.launch(IO) {
+                    try {
+                        val url = buildString {
+                            append(base).append("/api/legado/book-abandon?id=").append(id)
+                            if (token.isNotEmpty()) append("&token=").append(token)
+                        }
+                        okHttpClient.newCallStrResponse {
+                            url(url)
+                            postJson("{}")
+                        }
+                        runOnUI {
+                            toastOnUi("已废弃")
+                            viewModel.delBook(deleteOriginal = false) { finish() }
+                        }
+                    } catch (e: Exception) {
+                        runOnUI { toastOnUi("废弃失败: ${e.localizedMessage}") }
+                    }
+                }
+            }
+            noButton()
         }
     }
 
