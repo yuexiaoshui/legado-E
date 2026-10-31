@@ -6,10 +6,10 @@ import androidx.core.net.toUri
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ActivityTranslucenceBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.book.info.BookInfoActivity
-import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -116,9 +116,11 @@ class OnLineImportActivity :
     }
 
     /**
-     * 直达书籍详情页：bookUrl 命中书架直接打开，否则用书名回退书源搜索。
+     * 直达书籍详情页：书架已有该书时直接打开；
+     * 未入库时构造临时 SearchBook 记录（与点搜索结果进详情的机制一致），
+     * 同样直达详情页，详情页内可「加入书架」。
      * 书源按 bookUrl 的 host 匹配（书库源 bookSourceUrl 就是服务器根地址）。
-     * 精确匹配失败时做两级兜底：
+     * 书架匹配失败时做两级兜底：
      *   1. 按服务端书籍 id 在 bookUrl 里模糊匹配（书源与订阅源导入时的
      *      base 地址可能不一致，如内网 IP / 域名 / 端口差异导致绝对地址不同）；
      *   2. 按 书名+作者 匹配。
@@ -144,12 +146,24 @@ class OnLineImportActivity :
         }
         val source = origin.takeIf { it.isNotBlank() }
             ?.let { appDb.bookSourceDao.getBookSource(it) }
-        if (source == null || name.isBlank()) {
+        if (source == null) {
             toastOnUi(R.string.error)
             finish()
             return
         }
-        SearchActivity.start(this, source, name)
+        val searchBook = SearchBook().apply {
+            this.bookUrl = bookUrl
+            this.origin = source.bookSourceUrl
+            this.originName = source.bookSourceName
+            this.name = name
+            this.author = author
+        }
+        appDb.searchBookDao.insert(searchBook)
+        startActivity<BookInfoActivity> {
+            putExtra("name", name)
+            putExtra("author", author)
+            putExtra("bookUrl", bookUrl)
+        }
         finish()
     }
 
