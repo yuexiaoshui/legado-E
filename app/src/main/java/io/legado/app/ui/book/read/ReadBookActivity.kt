@@ -1,9 +1,13 @@
 package io.legado.app.ui.book.read
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.os.Looper
 import android.view.Gravity
 import android.view.InputDevice
@@ -464,39 +468,36 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 查看当前章节的源文件内容（分章问题排查用）。
-     * 在线书读服务端缓存正文，本地书读本地文件；展示前 30k 字符，支持一键复制全文。
+     * 下载整本源文本到「下载」目录（核对文本与分章用）。
+     * 不在阅读页里渲染整本书，避免超大文件卡死界面；由系统下载器流式落盘。
+     * 在线书走服务端 /api/legado/source-file（整本 UTF-8 文本）。
      */
-    private fun showSourceText() {
+    private fun downloadSourceText() {
         val book = ReadBook.book ?: return
-        val chapter = ReadBook.curTextChapter?.chapter
-            ?: appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
-            ?: return
-        lifecycleScope.launch {
-            val result = withContext(IO) {
-                runCatching { BookHelp.getContent(book, chapter) }
-            }
-            val text = result.getOrElse {
-                toastOnUi(it.message ?: "读取失败")
-                return@launch
-            } ?: ""
-            if (text.isBlank()) {
-                toastOnUi("内容为空")
-                return@launch
-            }
-            val display = if (text.length > 30000) {
-                text.substring(0, 30000) + "\n\n…（预览已截断，可复制全文）"
-            } else text
-            val title = getString(R.string.view_source_text) + " · " + (chapter.title ?: "")
-            val binding = DialogEditTextBinding.inflate(layoutInflater)
-            binding.editView.setText(display)
-            binding.editView.isFocusable = false
-            binding.editView.setTextIsSelectable(true)
-            alert(title) {
-                customView { binding.root }
-                positiveButton(R.string.copy_source_text) { sendToClip(text) }
-                okButton()
-            }
+        if (book.isLocal) {
+            toastOnUi("本地书籍无需下载，文件就在本机")
+            return
+        }
+        if (!book.bookUrl.contains("/api/legado/toc")) {
+            toastOnUi("当前书源不支持下载源文件")
+            return
+        }
+        val url = book.bookUrl.replace("/api/legado/toc", "/api/legado/source-file")
+        val rawName = book.name.substringBeforeLast('.', book.name).ifBlank { "book" }
+        val fileName = rawName.replace(Regex("[\\\\/:*?\"<>|]"), "_") + ".txt"
+        try {
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle(fileName)
+                .setDescription("整本源文本（核对分章用）")
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            dm.enqueue(request)
+            toastOnUi("已开始下载：$fileName（在「下载」目录查看）")
+        } catch (e: Exception) {
+            toastOnUi("下载失败：${e.localizedMessage}")
         }
     }
 
@@ -617,7 +618,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 TxtTocRuleDialog(ReadBook.book?.tocUrl)
             )
 
-            R.id.menu_source_text -> showSourceText()
+            R.id.menu_source_text -> downloadSourceText()
 
             R.id.menu_reverse_content -> ReadBook.book?.let {
                 viewModel.reverseContent(it)

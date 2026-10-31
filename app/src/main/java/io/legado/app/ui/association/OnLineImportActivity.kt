@@ -146,6 +146,9 @@ class OnLineImportActivity :
         }
         val source = origin.takeIf { it.isNotBlank() }
             ?.let { appDb.bookSourceDao.getBookSource(it) }
+            // host 对不上（内网 IP / 域名 / 端口差异）时，退回书库源本身
+            ?: appDb.bookSourceDao.getEnabledByType(0)
+                .firstOrNull { it.searchUrl?.contains("/api/legado/search") == true }
         if (source == null) {
             toastOnUi(R.string.error)
             finish()
