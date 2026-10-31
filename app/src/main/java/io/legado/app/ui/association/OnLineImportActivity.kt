@@ -118,9 +118,17 @@ class OnLineImportActivity :
     /**
      * 直达书籍详情页：bookUrl 命中书架直接打开，否则用书名回退书源搜索。
      * 书源按 bookUrl 的 host 匹配（书库源 bookSourceUrl 就是服务器根地址）。
+     * 精确匹配失败时做两级兜底：
+     *   1. 按服务端书籍 id 在 bookUrl 里模糊匹配（书源与订阅源导入时的
+     *      base 地址可能不一致，如内网 IP / 域名 / 端口差异导致绝对地址不同）；
+     *   2. 按 书名+作者 匹配。
      */
     private fun openBookInfo(bookUrl: String, name: String, author: String) {
         val book = appDb.bookDao.getBook(bookUrl)
+            ?: bookUrl.toUri().getQueryParameter("id")?.let { id ->
+                appDb.bookDao.getBookByTocId("%toc?id=$id&%", "%toc?id=$id")
+            }
+            ?: (if (name.isNotBlank()) appDb.bookDao.getBook(name, author) else null)
         if (book != null) {
             startActivity<BookInfoActivity> {
                 putExtra("name", book.name)

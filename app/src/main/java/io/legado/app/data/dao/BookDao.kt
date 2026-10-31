@@ -121,6 +121,10 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE bookUrl = :bookUrl")
     fun getBook(bookUrl: String): Book?
 
+    /** 按服务端 toc 地址模糊匹配（直达书籍详情页兜底：base 地址可能不一致） */
+    @Query("SELECT * FROM books WHERE bookUrl LIKE :withSuffix OR bookUrl LIKE :atEnd LIMIT 1")
+    fun getBookByTocId(withSuffix: String, atEnd: String): Book?
+
     @Query("SELECT * FROM books WHERE name = :name and author = :author")
     fun getBook(name: String, author: String): Book?
 
