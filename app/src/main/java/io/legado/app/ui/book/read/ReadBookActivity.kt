@@ -54,7 +54,9 @@ import io.legado.app.help.source.getSourceType
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.utils.sendToClip
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
@@ -462,6 +464,43 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
+     * 查看当前章节的源文件内容（分章问题排查用）。
+     * 在线书读服务端缓存正文，本地书读本地文件；展示前 30k 字符，支持一键复制全文。
+     */
+    private fun showSourceText() {
+        val book = ReadBook.book ?: return
+        val chapter = ReadBook.curTextChapter?.chapter
+            ?: appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+            ?: return
+        lifecycleScope.launch {
+            val result = withContext(IO) {
+                runCatching { BookHelp.getContent(book, chapter) }
+            }
+            val text = result.getOrElse {
+                toastOnUi(it.message ?: "读取失败")
+                return@launch
+            } ?: ""
+            if (text.isBlank()) {
+                toastOnUi("内容为空")
+                return@launch
+            }
+            val display = if (text.length > 30000) {
+                text.substring(0, 30000) + "\n\n…（预览已截断，可复制全文）"
+            } else text
+            val title = getString(R.string.view_source_text) + " · " + (chapter.title ?: "")
+            val binding = DialogEditTextBinding.inflate(layoutInflater)
+            binding.editView.setText(display)
+            binding.editView.isFocusable = false
+            binding.editView.setTextIsSelectable(true)
+            alert(title) {
+                customView { binding.root }
+                positiveButton(R.string.copy_source_text) { sendToClip(text) }
+                okButton()
+            }
+        }
+    }
+
+    /**
      * 菜单
      */
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
@@ -577,6 +616,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             R.id.menu_toc_regex -> showDialogFragment(
                 TxtTocRuleDialog(ReadBook.book?.tocUrl)
             )
+
+            R.id.menu_source_text -> showSourceText()
 
             R.id.menu_reverse_content -> ReadBook.book?.let {
                 viewModel.reverseContent(it)

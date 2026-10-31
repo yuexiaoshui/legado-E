@@ -2,11 +2,17 @@ package io.legado.app.ui.association
 
 import android.os.Bundle
 import androidx.activity.viewModels
+import androidx.core.net.toUri
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
+import io.legado.app.data.appDb
 import io.legado.app.databinding.ActivityTranslucenceBinding
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.ui.book.info.BookInfoActivity
+import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 /**
@@ -55,6 +61,12 @@ class OnLineImportActivity :
                 return
             }
             when (it.path) {
+                "/bookInfo" -> {
+                    // 直达书籍详情页（书架里已有该书时）；未入库则回退到书源搜索
+                    openBookInfo(url, it.getQueryParameter("name") ?: "",
+                        it.getQueryParameter("author") ?: "")
+                }
+
                 "/bookSource" -> showDialogFragment(
                     ImportBookSourceDialog(url, true)
                 )
@@ -101,6 +113,36 @@ class OnLineImportActivity :
                 else -> viewModel.determineType(url, this::finallyDialog)
             }
         }
+    }
+
+    /**
+     * 直达书籍详情页：bookUrl 命中书架直接打开，否则用书名回退书源搜索。
+     * 书源按 bookUrl 的 host 匹配（书库源 bookSourceUrl 就是服务器根地址）。
+     */
+    private fun openBookInfo(bookUrl: String, name: String, author: String) {
+        val book = appDb.bookDao.getBook(bookUrl)
+        if (book != null) {
+            startActivity<BookInfoActivity> {
+                putExtra("name", book.name)
+                putExtra("author", book.author)
+                putExtra("bookUrl", book.bookUrl)
+            }
+            finish()
+            return
+        }
+        val uri = bookUrl.toUri()
+        val origin = uri.let { u ->
+            if (u.host.isNullOrBlank()) "" else "${u.scheme ?: "http"}://${u.host}"
+        }
+        val source = origin.takeIf { it.isNotBlank() }
+            ?.let { appDb.bookSourceDao.getBookSource(it) }
+        if (source == null || name.isBlank()) {
+            toastOnUi(R.string.error)
+            finish()
+            return
+        }
+        SearchActivity.start(this, source, name)
+        finish()
     }
 
     private fun finallyDialog(title: String, msg: String) {
