@@ -85,7 +85,8 @@ object BookInfo {
             analyzeRule.getStringList(infoRule.kind)
                 ?.joinToString(",")
                 ?.let {
-                    if (it.isNotEmpty()) book.kind = it
+                    // 为空也回写：清理历史残留（服务端曾把分章规则放进 kind）
+                    book.kind = it
                     Debug.log(bookSource.bookSourceUrl, "└${it}")
                 } ?: Debug.log(bookSource.bookSourceUrl, "└")
         } catch (e: Exception) {
