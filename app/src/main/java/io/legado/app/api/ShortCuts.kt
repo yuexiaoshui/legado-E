@@ -50,12 +50,26 @@ object ShortCuts {
             .build()
     }
 
+    /** 桌面长按图标 → 立即备份到 WebDav（不进 App，不走设置页） */
+    private fun buildQuickBackupShortCutInfo(context: Context): ShortcutInfoCompat {
+        val intent = Intent(context, SharedReceiverActivity::class.java)
+        intent.action = Intent.ACTION_VIEW
+        intent.putExtra("action", "quickBackup")
+        return ShortcutInfoCompat.Builder(context, "quickBackup")
+            .setShortLabel(context.getString(R.string.quick_backup_short))
+            .setLongLabel(context.getString(R.string.quick_backup_long))
+            .setIcon(IconCompat.createWithResource(context, R.drawable.ic_backup))
+            .setIntent(intent)
+            .build()
+    }
+
     fun buildShortCuts(context: Context) {
         ShortcutManagerCompat.setDynamicShortcuts(
             context, listOf(
                 buildReadBookShortCutInfo(context),
                 buildReadAloudShortCutInfo(context),
-                buildBookShelfShortCutInfo(context)
+                buildBookShelfShortCutInfo(context),
+                buildQuickBackupShortCutInfo(context)
             )
         )
     }

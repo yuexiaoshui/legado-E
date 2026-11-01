@@ -71,6 +71,19 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_quick_backup"
+        android:icon="@drawable/ic_backup"
+        android:title="@string/quick_backup"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_quick_restore"
+        android:icon="@drawable/ic_cfg_backup"
+        android:title="@string/quick_restore_plain"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_log"
         android:icon="@drawable/ic_cfg_about"
         android:title="@string/log"

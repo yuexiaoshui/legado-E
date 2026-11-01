@@ -8,6 +8,7 @@ import androidx.core.view.indices
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.EventBus
@@ -16,9 +17,12 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
 import io.legado.app.databinding.DialogEditTextBinding
+import io.legado.app.help.AppWebDav
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.QuickBackup
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.webdav.WebDavFile
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.cache.CacheActivity
 import io.legado.app.ui.book.group.GroupManageDialog
@@ -39,6 +43,12 @@ import io.legado.app.utils.sendToClip
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** 云端备份检查结果的缓存时长，避免频繁切换标签页时重复请求 WebDav */
+private const val CLOUD_CHECK_INTERVAL = 60_000L
 
 abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfViewModel>(layoutId),
     MainFragmentInterface {
@@ -90,6 +100,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
 
     override fun onCompatCreateOptionsMenu(menu: Menu) {
         menuInflater.inflate(R.menu.main_bookshelf, menu)
+        refreshQuickRestoreItem(menu)
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem) {
@@ -119,7 +130,63 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             }
 
             R.id.menu_import_bookshelf -> importBookshelfAlert(groupId)
+            R.id.menu_quick_backup -> quickBackup()
+            R.id.menu_quick_restore -> quickRestore()
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
+        }
+    }
+
+    private var cloudBackup: WebDavFile? = null
+    private var cloudCheckAt = 0L
+
+    /**
+     * 云端存在比本机新的备份时，才显示「恢复云端备份（月-日 时:分）」这一项。
+     * 检查结果缓存 60 秒，避免频繁切标签页重复请求 WebDav。
+     */
+    private fun refreshQuickRestoreItem(menu: Menu) {
+        val item = menu.findItem(R.id.menu_quick_restore) ?: return
+        if (!AppWebDav.isOk || view == null) {
+            item.isVisible = false
+            return
+        }
+        if (System.currentTimeMillis() - cloudCheckAt < CLOUD_CHECK_INTERVAL) {
+            applyCloudBackupItem(item)
+            return
+        }
+        cloudCheckAt = System.currentTimeMillis()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) { QuickBackup.newestCloudBackup() }
+            cloudBackup = file
+            applyCloudBackupItem(item)
+        }
+    }
+
+    private fun applyCloudBackupItem(item: MenuItem) {
+        val file = cloudBackup
+        if (file == null) {
+            item.isVisible = false
+            return
+        }
+        item.isVisible = true
+        item.title = getString(R.string.quick_restore, QuickBackup.timeText(file.lastModify))
+    }
+
+    private fun quickBackup() {
+        cloudCheckAt = 0L
+        QuickBackup.backup(requireContext())
+    }
+
+    private fun quickRestore() {
+        val file = cloudBackup
+        if (file == null) {
+            toastOnUi(R.string.quick_restore_no_new)
+            return
+        }
+        val timeText = QuickBackup.timeText(file.lastModify)
+        alert(R.string.quick_restore_plain) {
+            setMessage(getString(R.string.quick_restore_confirm, timeText))
+            okButton { QuickBackup.restore(file.displayName) }
+            cancelButton()
         }
     }
 
